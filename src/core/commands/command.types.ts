@@ -1,7 +1,7 @@
 import type {
   ConfirmationLevel,
   NexusPermission,
-} from '../permissions/permission.types'
+} from '../permissions/permission.types.js'
 
 export type NexusModule =
   | 'global'
@@ -13,7 +13,11 @@ export type NexusModule =
 
 export type NexusPlatform = 'windows' | 'linux'
 
-export type CommandSource = 'ui' | 'ai' | 'automation' | 'remote'
+export type CommandSource =
+  | 'ui'
+  | 'ai'
+  | 'automation'
+  | 'remote'
 
 export interface NexusTarget {
   type: 'local'
@@ -24,12 +28,18 @@ export interface NexusCommandContext {
   target: NexusTarget
 }
 
-export type NexusCommandHandler<TPayload = unknown, TResult = unknown> = (
+export type NexusCommandHandler<
+  TPayload = unknown,
+  TResult = unknown,
+> = (
   payload: TPayload,
   context: NexusCommandContext,
 ) => Promise<TResult>
 
-export interface NexusCommand<TPayload = unknown, TResult = unknown> {
+export interface NexusCommand<
+  TPayload = unknown,
+  TResult = unknown,
+> {
   id: string
   module: NexusModule
   description: string

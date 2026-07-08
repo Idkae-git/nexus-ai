@@ -1,10 +1,10 @@
-import type { PermissionDecision } from '../permissions/permission.types'
-import { PermissionManager } from '../permissions/permission-manager'
+import type { PermissionDecision } from '../permissions/permission.types.js'
+import { PermissionManager } from '../permissions/permission-manager.js'
 import type {
     NexusCommandContext,
     NexusCommandRequest,
-} from './command.types'
-import { CommandRegistry } from './command-registry'
+} from './command.types.js'
+import { CommandRegistry } from './command-registry.js'
 
 export type CommandExecutionStatus =
     | 'success'
@@ -48,7 +48,10 @@ export class CommandExecutor {
         }
 
         const decision: PermissionDecision =
-            this.permissionManager.evaluate(command.confirmation, context)
+            this.permissionManager.evaluate(
+                command.confirmation,
+                context,
+            )
 
         if (decision === 'deny') {
             return {
@@ -63,7 +66,10 @@ export class CommandExecutor {
         }
 
         try {
-            const data = await command.execute(request.payload, context)
+            const data = await command.execute(
+                request.payload,
+                context,
+            )
 
             return {
                 status: 'success',
@@ -72,7 +78,10 @@ export class CommandExecutor {
         } catch (error) {
             return {
                 status: 'failed',
-                error: error instanceof Error ? error.message : 'Unknown error',
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : 'Unknown error',
             }
         }
     }

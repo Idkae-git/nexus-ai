@@ -1,8 +1,8 @@
-import type { NexusCommandContext } from '../commands/command.types'
+import type { NexusCommandContext } from '../commands/command.types.js'
 import type {
     ConfirmationLevel,
     PermissionDecision,
-} from './permission.types'
+} from './permission.types.js'
 
 export class PermissionManager {
     evaluate(

@@ -1,7 +1,7 @@
 import type {
   CommandSource,
   NexusTarget,
-} from '../commands/command.types'
+} from '../commands/command.types.js'
 
 export type NexusActivityStatus =
   | 'requested'

@@ -1,17 +1,26 @@
-import type { NexusCommand } from './command.types'
+import type { NexusCommand } from './command.types.js'
+
+type RegistryCommand = NexusCommand<any, any>
 
 export class CommandRegistry {
-    private readonly commands = new Map<string, NexusCommand>()
+    private readonly commands = new Map<
+        string,
+        RegistryCommand
+    >()
 
-    register(command: NexusCommand): void {
+    register<TPayload, TResult>(
+        command: NexusCommand<TPayload, TResult>,
+    ): void {
         if (this.commands.has(command.id)) {
-            throw new Error(`Command "${command.id}" is already registered`)
+            throw new Error(
+                `Command "${command.id}" is already registered`,
+            )
         }
 
         this.commands.set(command.id, command)
     }
 
-    get(commandId: string): NexusCommand | undefined {
+    get(commandId: string): RegistryCommand | undefined {
         return this.commands.get(commandId)
     }
 
@@ -19,7 +28,7 @@ export class CommandRegistry {
         return this.commands.has(commandId)
     }
 
-    list(): NexusCommand[] {
+    list(): RegistryCommand[] {
         return Array.from(this.commands.values())
     }
 }
