@@ -9,6 +9,7 @@ import { CommandRegistry } from '../src/core/commands/command-registry.js'
 import type { NexusCommand } from '../src/core/commands/command.types.js'
 import { PermissionManager } from '../src/core/permissions/permission-manager.js'
 import { WindowsSystemBridge } from './platform/windows/windows-system-bridge.js'
+import { PendingCommandStore } from '../src/core/commands/pending-command-store.js'
 
 const currentFilePath = fileURLToPath(import.meta.url)
 const currentDirectory = path.dirname(currentFilePath)
@@ -16,9 +17,12 @@ const currentDirectory = path.dirname(currentFilePath)
 const registry = new CommandRegistry()
 const permissionManager = new PermissionManager()
 
+const pendingCommandStore = new PendingCommandStore()
+
 const executor = new CommandExecutor(
     registry,
     permissionManager,
+    pendingCommandStore,
 )
 
 const systemBridge = new WindowsSystemBridge()
@@ -77,6 +81,31 @@ ipcMain.handle('nexus:system:lock', async () => {
         createdAt: Date.now(),
     })
 })
+
+ipcMain.handle(
+    'nexus:command:confirm',
+    async (_event, requestId: unknown) => {
+        if (typeof requestId !== 'string') {
+            return {
+                status: 'failed',
+                error: 'Invalid request ID',
+            }
+        }
+
+        return executor.confirm(requestId)
+    },
+)
+
+ipcMain.handle(
+    'nexus:command:cancel',
+    (_event, requestId: unknown) => {
+        if (typeof requestId !== 'string') {
+            return false
+        }
+
+        return executor.cancel(requestId)
+    },
+)
 
 function createWindow(): void {
     const window = new BrowserWindow({

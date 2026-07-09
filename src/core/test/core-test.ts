@@ -1,7 +1,8 @@
-import { CommandExecutor } from '../commands/command-executor'
-import { CommandRegistry } from '../commands/command-registry'
-import type { NexusCommand } from '../commands/command.types'
-import { PermissionManager } from '../permissions/permission-manager'
+import { CommandExecutor } from '../commands/command-executor.js'
+import { CommandRegistry } from '../commands/command-registry.js'
+import type { NexusCommand } from '../commands/command.types.js'
+import { PendingCommandStore } from '../commands/pending-command-store.js'
+import { PermissionManager } from '../permissions/permission-manager.js'
 
 interface PingResult {
     message: string
@@ -10,10 +11,12 @@ interface PingResult {
 
 const registry = new CommandRegistry()
 const permissionManager = new PermissionManager()
+const pendingCommandStore = new PendingCommandStore()
 
 const executor = new CommandExecutor(
     registry,
     permissionManager,
+    pendingCommandStore,
 )
 
 const pingCommand: NexusCommand<void, PingResult> = {
