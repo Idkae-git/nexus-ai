@@ -6,18 +6,18 @@ import { app, BrowserWindow, ipcMain } from 'electron'
 
 import { CommandExecutor } from '../src/core/commands/command-executor.js'
 import { CommandRegistry } from '../src/core/commands/command-registry.js'
-import type { NexusCommand } from '../src/core/commands/command.types.js'
-import { PermissionManager } from '../src/core/permissions/permission-manager.js'
-import { WindowsSystemBridge } from './platform/windows/windows-system-bridge.js'
 import { PendingCommandStore } from '../src/core/commands/pending-command-store.js'
+import { PermissionManager } from '../src/core/permissions/permission-manager.js'
+import { SystemModule } from './modules/system/system-module.js'
+import { WindowsSystemBridge } from './platform/windows/windows-system-bridge.js'
 
 const currentFilePath = fileURLToPath(import.meta.url)
 const currentDirectory = path.dirname(currentFilePath)
 
 const registry = new CommandRegistry()
 const permissionManager = new PermissionManager()
-
 const pendingCommandStore = new PendingCommandStore()
+const systemBridge = new WindowsSystemBridge()
 
 const executor = new CommandExecutor(
     registry,
@@ -25,36 +25,12 @@ const executor = new CommandExecutor(
     pendingCommandStore,
 )
 
-const systemBridge = new WindowsSystemBridge()
+const systemModule = new SystemModule(
+    registry,
+    systemBridge,
+)
 
-const pingCommand: NexusCommand<void, string> = {
-    id: 'system.ping',
-    module: 'system',
-    description: 'Check NEXUS Core availability',
-    permission: 'system.read',
-    confirmation: 'none',
-    platforms: ['windows'],
-
-    async execute() {
-        return 'NEXUS CORE ONLINE'
-    },
-}
-
-const lockCommand: NexusCommand<void, void> = {
-    id: 'system.lock',
-    module: 'system',
-    description: 'Lock the local Windows session',
-    permission: 'system.power',
-    confirmation: 'critical',
-    platforms: ['windows'],
-
-    async execute() {
-        await systemBridge.lock()
-    },
-}
-
-registry.register(pingCommand)
-registry.register(lockCommand)
+systemModule.register()
 
 ipcMain.handle('nexus:ping', async () => {
     return executor.execute({
@@ -111,6 +87,7 @@ function createWindow(): void {
     const window = new BrowserWindow({
         width: 1440,
         height: 900,
+
         webPreferences: {
             preload: path.join(currentDirectory, 'preload.cjs'),
             contextIsolation: true,
