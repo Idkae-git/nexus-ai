@@ -3,6 +3,8 @@ import { CommandRegistry } from '../commands/command-registry.js'
 import type { NexusCommand } from '../commands/command.types.js'
 import { PendingCommandStore } from '../commands/pending-command-store.js'
 import { PermissionManager } from '../permissions/permission-manager.js'
+import { ActivityService } from '../activity/activity-service.js'
+import { ActivityStore } from '../activity/activity-store.js'
 
 interface PingResult {
     message: string
@@ -12,11 +14,13 @@ interface PingResult {
 const registry = new CommandRegistry()
 const permissionManager = new PermissionManager()
 const pendingCommandStore = new PendingCommandStore()
+const activityService = new ActivityService(new ActivityStore())
 
 const executor = new CommandExecutor(
     registry,
     permissionManager,
     pendingCommandStore,
+    activityService,
 )
 
 const pingCommand: NexusCommand<void, PingResult> = {

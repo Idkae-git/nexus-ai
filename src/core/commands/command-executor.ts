@@ -1,49 +1,61 @@
-import type { PermissionDecision } from '../permissions/permission.types.js'
-import { PermissionManager } from '../permissions/permission-manager.js'
 import type {
     NexusCommandContext,
     NexusCommandRequest,
+    NexusCommandResult,
 } from './command.types.js'
+
 import { CommandRegistry } from './command-registry.js'
 import { PendingCommandStore } from './pending-command-store.js'
-
-export type CommandExecutionStatus =
-    | 'success'
-    | 'denied'
-    | 'confirmation_required'
-    | 'failed'
-
-export interface CommandExecutionResult<TResult = unknown> {
-    status: CommandExecutionStatus
-    requestId?: string
-    data?: TResult
-    error?: string
-}
+import { PermissionManager } from '../permissions/permission-manager.js'
+import type { PermissionDecision } from '../permissions/permission.types.js'
+import { ActivityService } from '../activity/activity-service.js'
 
 export class CommandExecutor {
     private readonly registry: CommandRegistry
+
     private readonly permissionManager: PermissionManager
-    private readonly pendingCommandStore: PendingCommandStore
+
+    private readonly pendingStore: PendingCommandStore
+
+    private readonly activityService: ActivityService
 
     constructor(
         registry: CommandRegistry,
         permissionManager: PermissionManager,
-        pendingCommandStore: PendingCommandStore,
+        pendingStore: PendingCommandStore,
+        activityService: ActivityService,
     ) {
         this.registry = registry
         this.permissionManager = permissionManager
-        this.pendingCommandStore = pendingCommandStore
+        this.pendingStore = pendingStore
+        this.activityService = activityService
     }
 
     async execute<TResult = unknown>(
         request: NexusCommandRequest,
-    ): Promise<CommandExecutionResult<TResult>> {
-        const command = this.registry.get(request.command)
+    ): Promise<NexusCommandResult<TResult>> {
+        this.activityService.request({
+            id: request.id,
+            command: request.command,
+            source: request.source,
+            createdAt: request.createdAt,
+        })
+
+        const command =
+            this.registry.get(request.command)
 
         if (!command) {
+            const error = `Unknown command "${request.command}"`
+            this.activityService.complete(
+                request.id,
+                'failed',
+                { error },
+            )
+
             return {
                 status: 'failed',
-                error: `Command "${request.command}" was not found`,
+                requestId: request.id,
+                error,
             }
         }
 
@@ -58,52 +70,76 @@ export class CommandExecutor {
                 context,
             )
 
-        if (decision === 'deny') {
-            return {
-                status: 'denied',
-            }
+        switch (decision) {
+            case 'deny':
+                this.activityService.complete(
+                    request.id,
+                    'denied',
+                )
+
+                return {
+                    status: 'denied',
+                    requestId: request.id,
+                }
+
+            case 'confirm':
+                this.pendingStore.add(request)
+                this.activityService.complete(
+                    request.id,
+                    'confirmation_required',
+                )
+
+                return {
+                    status:
+                        'confirmation_required',
+                    requestId: request.id,
+                }
+
+            case 'allow':
+                return this.run<TResult>(
+                    command,
+                    request,
+                    context,
+                )
         }
-
-        if (decision === 'confirm') {
-            this.pendingCommandStore.add(request)
-
-            return {
-                status: 'confirmation_required',
-                requestId: request.id,
-            }
-        }
-
-        return this.runCommand<TResult>(request)
     }
 
     async confirm<TResult = unknown>(
         requestId: string,
-    ): Promise<CommandExecutionResult<TResult>> {
-        const request = this.pendingCommandStore.take(requestId)
+    ): Promise<NexusCommandResult<TResult>> {
+        const request =
+            this.pendingStore.take(requestId)
 
         if (!request) {
+            const error = 'Pending command not found or expired.'
+            this.activityService.complete(
+                requestId,
+                'failed',
+                { error },
+            )
+
             return {
                 status: 'failed',
-                error: 'Pending command was not found or has expired',
+                requestId,
+                error,
             }
         }
 
-        return this.runCommand<TResult>(request)
-    }
-
-    cancel(requestId: string): boolean {
-        return this.pendingCommandStore.cancel(requestId)
-    }
-
-    private async runCommand<TResult>(
-        request: NexusCommandRequest,
-    ): Promise<CommandExecutionResult<TResult>> {
-        const command = this.registry.get(request.command)
+        const command =
+            this.registry.get(request.command)
 
         if (!command) {
+            const error = 'Command no longer exists.'
+            this.activityService.complete(
+                requestId,
+                'failed',
+                { error },
+            )
+
             return {
                 status: 'failed',
-                error: `Command "${request.command}" was not found`,
+                requestId,
+                error,
             }
         }
 
@@ -112,23 +148,81 @@ export class CommandExecutor {
             target: request.target,
         }
 
+        return this.run<TResult>(
+            command,
+            request,
+            context,
+        )
+    }
+
+    cancel(
+        requestId: string,
+    ): boolean {
+        const cancelled = this.pendingStore.cancel(
+            requestId,
+        )
+
+        if (cancelled) {
+            this.activityService.complete(
+                requestId,
+                'cancelled',
+            )
+        } else if (this.activityService.get(requestId)) {
+            this.activityService.complete(
+                requestId,
+                'failed',
+                {
+                    error: 'Pending command not found or expired.',
+                },
+            )
+        }
+
+        return cancelled
+    }
+
+    private async run<TResult>(
+        command: NonNullable<
+            ReturnType<
+                CommandRegistry['get']
+            >
+        >,
+        request: NexusCommandRequest,
+        context: NexusCommandContext,
+    ): Promise<NexusCommandResult<TResult>> {
         try {
-            const data = await command.execute(
-                request.payload,
-                context,
+            const result =
+                await command.execute(
+                    request.payload,
+                    context,
+                )
+
+            this.activityService.complete(
+                request.id,
+                'success',
+                { result },
             )
 
             return {
                 status: 'success',
-                data: data as TResult,
+                requestId: request.id,
+                data: result as TResult,
             }
         } catch (error) {
+            const message =
+                error instanceof Error
+                    ? error.message
+                    : 'Unknown error'
+
+            this.activityService.complete(
+                request.id,
+                'failed',
+                { error: message },
+            )
+
             return {
                 status: 'failed',
-                error:
-                    error instanceof Error
-                        ? error.message
-                        : 'Unknown error',
+                requestId: request.id,
+                error: message,
             }
         }
     }

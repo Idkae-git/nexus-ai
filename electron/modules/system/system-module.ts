@@ -1,25 +1,46 @@
 import type { CommandRegistry } from '../../../src/core/commands/command-registry.js'
 import type { NexusCommand } from '../../../src/core/commands/command.types.js'
 import type { SystemBridge } from '../../../src/core/platform/system-bridge.js'
+import type {
+    SystemInfo,
+    SystemInfoService,
+} from '../../../src/core/platform/system-info.js'
 
 export class SystemModule {
     private readonly registry: CommandRegistry
     private readonly systemBridge: SystemBridge
 
+    private readonly systemInfoService: SystemInfoService
+
     constructor(
         registry: CommandRegistry,
         systemBridge: SystemBridge,
+        systemInfoService: SystemInfoService,
     ) {
         this.registry = registry
         this.systemBridge = systemBridge
+        this.systemInfoService = systemInfoService
     }
 
     register(): void {
         this.registry.register(this.createPingCommand())
+        this.registry.register(this.createInfoCommand())
         this.registry.register(this.createLockCommand())
         this.registry.register(this.createShutdownCommand())
         this.registry.register(this.createRestartCommand())
         this.registry.register(this.createSleepCommand())
+    }
+
+    private createInfoCommand(): NexusCommand<void, SystemInfo> {
+        return {
+            id: 'system.info',
+            module: 'system',
+            description: 'Read local Windows system metrics',
+            permission: 'system.read',
+            confirmation: 'none',
+            platforms: ['windows'],
+            execute: () => this.systemInfoService.getInfo(),
+        }
     }
 
     private createPingCommand(): NexusCommand<void, string> {

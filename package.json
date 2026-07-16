@@ -11,6 +11,7 @@
     "build": "tsc -b && vite build && npm run build:electron",
     "build:electron": "node -e \"require('fs').rmSync('dist-electron',{recursive:true,force:true})\" && tsc -p tsconfig.electron.json",
     "lint": "oxlint .",
+    "test": "vitest",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -33,6 +34,7 @@
     "tsx": "^4.23.0",
     "typescript": "~6.0.2",
     "vite": "^8.1.1",
+    "vitest": "^4.0.18",
     "wait-on": "^9.0.10"
   }
 }

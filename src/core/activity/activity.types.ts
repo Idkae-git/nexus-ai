@@ -1,22 +1,49 @@
 import type {
   CommandSource,
-  NexusTarget,
 } from '../commands/command.types.js'
+
+/* ============================================================
+ * NEXUS CORE
+ * Activity System
+ * ============================================================
+ */
 
 export type NexusActivityStatus =
   | 'requested'
-  | 'confirmed'
-  | 'executing'
+  | 'confirmation_required'
   | 'success'
   | 'failed'
   | 'denied'
+  | 'cancelled'
 
-export interface NexusActivity {
+export interface NexusActivityEntry<
+  TResult = unknown,
+> {
   id: string
+
   command: string
+
   source: CommandSource
-  target: NexusTarget
+
   status: NexusActivityStatus
-  timestamp: number
+
+  createdAt: number
+
+  completedAt?: number
+
+  durationMs?: number
+
+  result?: TResult
+
   error?: string
+}
+
+export interface ActivityFilter {
+  command?: string
+
+  source?: CommandSource
+
+  status?: NexusActivityStatus
+
+  limit?: number
 }

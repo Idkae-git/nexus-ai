@@ -1,34 +1,79 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
-interface NexusRendererApi {
-    ping(): Promise<unknown>
-    lockSystem(): Promise<unknown>
-    confirmCommand(requestId: string): Promise<unknown>
-    cancelCommand(requestId: string): Promise<boolean>
+import type {
+    NexusCommandRequest,
+    NexusCommandResult,
+} from '../src/core/commands/command.types.js'
+import type {
+    ActivityFilter,
+    NexusActivityEntry,
+} from '../src/core/activity/activity.types.js'
+
+export interface NexusRendererApi {
+    ping(): Promise<NexusCommandResult<string>>
+
+    execute<TPayload = unknown, TResult = unknown>(
+        request: NexusCommandRequest<TPayload>,
+    ): Promise<NexusCommandResult<TResult>>
+
+    confirm(
+        requestId: string,
+    ): Promise<NexusCommandResult>
+
+    cancel(
+        requestId: string,
+    ): Promise<boolean>
+
+    listActivities(
+        filter?: ActivityFilter,
+    ): Promise<NexusActivityEntry[]>
+
+    clearActivities(): Promise<void>
 }
 
 const nexusApi: NexusRendererApi = {
-    ping(): Promise<unknown> {
-        return ipcRenderer.invoke('nexus:ping')
-    },
-
-    lockSystem(): Promise<unknown> {
-        return ipcRenderer.invoke('nexus:system:lock')
-    },
-
-    confirmCommand(requestId: string): Promise<unknown> {
+    ping() {
         return ipcRenderer.invoke(
-            'nexus:command:confirm',
+            'nexus:ping',
+        )
+    },
+
+    execute(request) {
+        return ipcRenderer.invoke(
+            'nexus:execute',
+            request,
+        )
+    },
+
+    confirm(requestId) {
+        return ipcRenderer.invoke(
+            'nexus:confirm',
             requestId,
         )
     },
 
-    cancelCommand(requestId: string): Promise<boolean> {
+    cancel(requestId) {
         return ipcRenderer.invoke(
-            'nexus:command:cancel',
+            'nexus:cancel',
             requestId,
+        )
+    },
+
+    listActivities(filter) {
+        return ipcRenderer.invoke(
+            'nexus:activities:list',
+            filter,
+        )
+    },
+
+    clearActivities() {
+        return ipcRenderer.invoke(
+            'nexus:activities:clear',
         )
     },
 }
 
-contextBridge.exposeInMainWorld('nexus', nexusApi)
+contextBridge.exposeInMainWorld(
+    'nexus',
+    nexusApi,
+)
