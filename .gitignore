@@ -25,6 +25,7 @@ dist-ssr
 
 # NEXUS
 dist-electron
+/artifacts/
 .env
 .env.*
 !.env.example

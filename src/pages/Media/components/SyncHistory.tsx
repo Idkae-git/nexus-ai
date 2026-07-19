@@ -1,0 +1,3 @@
+import type { WatchSyncHistoryEntry } from '../../../features/watch-connectors/connector.types.js'
+
+export function SyncHistory({ entries }: { entries: WatchSyncHistoryEntry[] }) { return <section className="sync-history"><header><span>TRAIL MEMORY</span><h3>Historique local</h3></header>{entries.length === 0 ? <p>Aucune synchronisation exécutée.</p> : <ol>{entries.slice(0, 10).map((entry) => <li key={entry.id}><i className={entry.failed > 0 ? 'has-errors' : ''} /><span><strong>{entry.connectorId} · {entry.direction}</strong><small>{entry.summary}</small></span><time>{new Date(entry.startedAt).toLocaleString('fr-FR')}</time></li>)}</ol>}</section> }

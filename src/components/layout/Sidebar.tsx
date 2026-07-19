@@ -1,27 +1,36 @@
+import { NavLink } from 'react-router-dom'
+
+import type { NavigationItem } from '../../types/navigation.js'
+import { SidebarItem } from './SidebarItem.tsx'
+
 interface SidebarProps {
   coreStatus: 'connecting' | 'online' | 'offline'
 }
 
-const navItems = ['Overview', 'Activity', 'Automations', 'Settings']
+const navItems: NavigationItem[] = [
+  { id: 'overview', label: 'Overview', path: '/', icon: 'overview' },
+  { id: 'gaming', label: 'Gaming', path: '/gaming', icon: 'gaming' },
+  { id: 'media', label: 'Media', path: '/media', icon: 'media' },
+  { id: 'applications', label: 'Applications', path: '/applications', icon: 'applications' },
+  { id: 'activity', label: 'Activity', path: '/activity', icon: 'activity' },
+  { id: 'automation', label: 'Automation', path: '/automation', icon: 'automation' },
+  { id: 'settings', label: 'Settings', path: '/settings', icon: 'settings' },
+]
 
 export function Sidebar({ coreStatus }: SidebarProps) {
   return (
     <aside className="sidebar">
-      <div className="brand">
+      <NavLink aria-label="NEXUS Overview" className="brand" to="/">
         <span className="brand-mark">N</span>
-        <div><strong>NEXUS</strong><span>CONTROL LAYER</span></div>
-      </div>
+        <span className="brand-copy"><strong>NEXUS</strong><span>CONTROL LAYER</span></span>
+      </NavLink>
       <nav className="sidebar-nav" aria-label="Primary navigation">
         <span className="nav-label">WORKSPACE</span>
-        {navItems.map((item, index) => (
-          <button className={index === 0 ? 'nav-item nav-item-active' : 'nav-item'} disabled={index !== 0} key={item}>
-            <span className="nav-glyph" aria-hidden="true">{index === 0 ? '◫' : '·'}</span>{item}
-          </button>
-        ))}
+        {navItems.map((item) => <SidebarItem item={item} key={item.id} />)}
       </nav>
       <div className="sidebar-footer">
         <div className={`status-orb status-orb-${coreStatus}`} />
-        <div><span>CORE STATUS</span><strong>{coreStatus.toUpperCase()}</strong></div>
+        <div className="sidebar-status-copy"><span>CORE STATUS</span><strong>{coreStatus.toUpperCase()}</strong></div>
       </div>
     </aside>
   )

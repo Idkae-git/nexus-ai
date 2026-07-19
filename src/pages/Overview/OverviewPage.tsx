@@ -1,20 +1,29 @@
 import type { NexusActivityEntry } from '../../core/activity/activity.types.js'
 import type { SystemInfo } from '../../core/platform/system-info.js'
-import { ActivityTimeline } from '../../components/activity/ActivityTimeline.tsx'
-import { MetricCard } from '../../components/dashboard/MetricCard.tsx'
-import { QuickActions } from '../../components/dashboard/QuickActions.tsx'
+import { TimelineItem } from '../../components/activity/TimelineItem.tsx'
+import { DashboardMetric } from '../../components/dashboard/DashboardMetric.tsx'
+import { ActionButton } from '../../components/ui/ActionButton.tsx'
+import { Icon } from '../../components/ui/Icon.tsx'
+import { QuickAction } from '../../components/ui/QuickAction.tsx'
 
 interface OverviewPageProps {
-  coreStatus: 'connecting' | 'online' | 'offline'
-  systemInfo: SystemInfo | null
-  systemError: string | null
-  isSystemLoading: boolean
-  activities: NexusActivityEntry[]
-  activitiesError: string | null
   actionMessage: string | null
+  activities: NexusActivityEntry[]
+  coreStatus: 'connecting' | 'online' | 'offline'
+  isSystemLoading: boolean
+  onNavigateToActivity: () => void
+  onNavigateToApplications: () => void
   onQuickAction: (command: string) => Promise<void>
-  onClearActivities: () => Promise<void>
+  systemError: string | null
+  systemInfo: SystemInfo | null
 }
+
+const quickActions = [
+  { command: 'system.lock', description: 'Secure session', icon: 'lock' as const, label: 'Lock' },
+  { command: 'system.sleep', description: 'Suspend activity', icon: 'moon' as const, label: 'Sleep' },
+  { command: 'system.restart', description: 'Restart safely', icon: 'restart' as const, label: 'Restart' },
+  { command: 'system.shutdown', description: 'Power down', icon: 'power' as const, label: 'Shutdown', critical: true },
+]
 
 function formatBytes(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes <= 0) return '0 GB'
@@ -28,40 +37,122 @@ function formatUptime(seconds: number): string {
   return days > 0 ? `${days}d ${hours}h` : `${hours}h ${minutes}m`
 }
 
-export function OverviewPage(props: OverviewPageProps) {
-  const disk = props.systemInfo?.disks[0]
-  const unavailable = !props.systemInfo && !props.isSystemLoading
+export function OverviewPage({
+  actionMessage,
+  activities,
+  coreStatus,
+  isSystemLoading,
+  onNavigateToActivity,
+  onNavigateToApplications,
+  onQuickAction,
+  systemError,
+  systemInfo,
+}: OverviewPageProps) {
+  const disk = systemInfo?.disks[0]
+  const unavailable = !systemInfo && !isSystemLoading
+  const recentActivities = activities.slice(0, 4)
+  const dateLabel = new Intl.DateTimeFormat(undefined, {
+    day: '2-digit',
+    month: 'short',
+    weekday: 'long',
+  }).format(new Date())
 
   return (
-    <main className="main-content">
-      <header className="topbar">
-        <div><span className="eyebrow">NEXUS / OVERVIEW</span><h1>System Overview</h1><p>Live telemetry and local command control.</p></div>
-        <div className="topbar-status"><span className={`status-orb status-orb-${props.coreStatus}`} /><div><span>NEXUS CORE</span><strong>{props.coreStatus.toUpperCase()}</strong></div></div>
+    <div className="page page-overview">
+      <header className="overview-header">
+        <div>
+          <span className="overview-context">WORLD 01 / MISSION CONTROL</span>
+          <h1>The Core</h1>
+        </div>
+        <div className="overview-header-meta">
+          <span>{dateLabel}</span>
+          <div className="overview-core-chip">
+            <i className={`status-orb status-orb-${coreStatus}`} />
+            <span>CORE</span>
+            <strong>{coreStatus.toUpperCase()}</strong>
+          </div>
+        </div>
       </header>
 
-      {props.systemError && <div className="notice notice-error">{props.systemError}</div>}
-      {props.actionMessage && <div className="notice">{props.actionMessage}</div>}
-
-      <section className="system-hero">
-        <div>
-          <div className="hero-badge"><span className={`status-orb status-orb-${props.coreStatus}`} /> LOCAL WINDOWS NODE</div>
-          <h2>{props.systemInfo?.hostname ?? (unavailable ? 'Unavailable' : 'Connecting…')}</h2>
-          <p>{props.systemInfo ? `${props.systemInfo.windowsVersion} · ${props.systemInfo.architecture}` : 'Establishing a secure connection to NEXUS Core.'}</p>
+      {(systemError || actionMessage) && (
+        <div className={`inline-notice${systemError ? ' inline-notice-error' : ''}`}>
+          <Icon name={systemError ? 'activity' : 'check'} size={14} />
+          <span>{systemError ?? actionMessage}</span>
         </div>
-        <div className="hero-visual" aria-hidden="true"><span className="orbit orbit-one" /><span className="orbit orbit-two" /><strong>N</strong></div>
+      )}
+
+      <section className="overview-command-layout">
+        <div className="overview-system-overview">
+          <header>
+            <span><i className={`status-orb status-orb-${coreStatus}`} /> LIVE SYSTEM</span>
+            <small>TELEMETRY / 5 SEC</small>
+          </header>
+          <div className="overview-host-row">
+            <div>
+              <small>ACTIVE DEVICE</small>
+              <h2>{systemInfo?.hostname ?? (unavailable ? 'System unavailable' : 'Connecting...')}</h2>
+              <p>{systemInfo ? `${systemInfo.windowsVersion} · ${systemInfo.architecture}` : 'Waiting for local system telemetry.'}</p>
+            </div>
+            <span className="overview-health-score">{coreStatus === 'online' ? '100' : '—'}<small>HEALTH</small></span>
+          </div>
+          <div className="overview-telemetry-chart" aria-hidden="true">
+            {Array.from({ length: 20 }, (_, index) => <i key={index} />)}
+          </div>
+          <footer>
+            <span><b>CPU</b>{systemInfo?.cpu.loadPercent ?? 0}%</span>
+            <span><b>MEM</b>{systemInfo?.memory.usedPercent ?? 0}%</span>
+            <span><b>DISK</b>{disk?.usedPercent ?? 0}%</span>
+            <span><b>THREADS</b>{systemInfo?.cpu.logicalProcessors ?? '—'}</span>
+          </footer>
+        </div>
+
+        <aside className="overview-daily-brief">
+          <header><span>DAILY BRIEF</span><small>LOCAL</small></header>
+          <div className="overview-brief-primary">
+            <small>UPTIME</small>
+            <strong>{systemInfo ? formatUptime(systemInfo.uptimeSeconds) : '—'}</strong>
+            <span>Continuous local session</span>
+          </div>
+          <dl>
+            <div><dt>Core events</dt><dd>{activities.length}</dd></div>
+            <div><dt>Storage free</dt><dd>{disk ? formatBytes(disk.freeBytes) : '—'}</dd></div>
+            <div><dt>Control scope</dt><dd>LOCAL</dd></div>
+          </dl>
+          <button className="overview-pinned-apps" onClick={onNavigateToApplications}>
+            <span><i>V</i><i>S</i><i>O</i></span>
+            <span><small>PINNED APPS</small><strong>3 available</strong></span>
+            <Icon name="chevron-right" size={14} />
+          </button>
+        </aside>
       </section>
 
-      <section className="metrics-grid" aria-label="System metrics">
-        <MetricCard label="CPU LOAD" value={unavailable ? '—' : `${props.systemInfo?.cpu.loadPercent ?? 0}%`} detail={props.systemInfo ? `${props.systemInfo.cpu.logicalProcessors} logical processors · ${props.systemInfo.cpu.model}` : 'Waiting for telemetry'} percentage={props.systemInfo?.cpu.loadPercent} loading={props.isSystemLoading && !props.systemInfo} />
-        <MetricCard label="MEMORY" value={unavailable ? '—' : `${props.systemInfo?.memory.usedPercent ?? 0}%`} detail={props.systemInfo ? `${formatBytes(props.systemInfo.memory.usedBytes)} of ${formatBytes(props.systemInfo.memory.totalBytes)} used` : 'Waiting for telemetry'} percentage={props.systemInfo?.memory.usedPercent} loading={props.isSystemLoading && !props.systemInfo} />
-        <MetricCard label="STORAGE" value={disk ? `${disk.usedPercent}%` : '—'} detail={disk ? `${disk.name} · ${formatBytes(disk.freeBytes)} available` : props.systemInfo ? 'No local disk reported' : 'Waiting for telemetry'} percentage={disk?.usedPercent} loading={props.isSystemLoading && !props.systemInfo} />
-        <MetricCard label="UPTIME" value={props.systemInfo ? formatUptime(props.systemInfo.uptimeSeconds) : '—'} detail={props.systemInfo ? `${props.systemInfo.platform} · ${props.systemInfo.architecture}` : 'Waiting for telemetry'} loading={props.isSystemLoading && !props.systemInfo} />
+      <section className="overview-metric-grid">
+        <DashboardMetric detail={systemInfo?.cpu.model ?? 'Waiting for telemetry'} icon="cpu" label="Processor" loading={isSystemLoading && !systemInfo} utilization={systemInfo?.cpu.loadPercent} value={unavailable ? '—' : `${systemInfo?.cpu.loadPercent ?? 0}%`} />
+        <DashboardMetric detail={systemInfo ? `${formatBytes(systemInfo.memory.usedBytes)} / ${formatBytes(systemInfo.memory.totalBytes)}` : 'Waiting for telemetry'} icon="memory" label="Memory" loading={isSystemLoading && !systemInfo} utilization={systemInfo?.memory.usedPercent} value={unavailable ? '—' : `${systemInfo?.memory.usedPercent ?? 0}%`} />
+        <DashboardMetric detail={disk ? `${disk.name} · ${formatBytes(disk.freeBytes)} free` : 'No disk reported'} icon="drive" label="Primary storage" loading={isSystemLoading && !systemInfo} utilization={disk?.usedPercent} value={disk ? `${disk.usedPercent}%` : '—'} />
+        <DashboardMetric detail="Current local session" icon="clock" label="System uptime" loading={isSystemLoading && !systemInfo} value={systemInfo ? formatUptime(systemInfo.uptimeSeconds) : '—'} />
       </section>
 
-      <div className="dashboard-grid">
-        <QuickActions disabled={props.coreStatus !== 'online'} onExecute={props.onQuickAction} />
-        <ActivityTimeline activities={props.activities} error={props.activitiesError} onClear={props.onClearActivities} />
-      </div>
-    </main>
+      <section className="overview-lower-layout">
+        <div className="overview-actions-console">
+          <header><div><span>CONTROL</span><h2>Quick actions</h2></div><small>SECURE GATEWAY</small></header>
+          <div className="overview-action-grid">
+            {quickActions.map((action) => <QuickAction {...action} disabled={coreStatus !== 'online'} key={action.command} onExecute={onQuickAction} />)}
+          </div>
+        </div>
+
+        <div className="overview-activity-ledger">
+          <header>
+            <div><span>AUDIT</span><h2>Recent activity</h2></div>
+            <ActionButton onClick={onNavigateToActivity} variant="ghost">Open ledger <Icon name="chevron-right" size={13} /></ActionButton>
+          </header>
+          {recentActivities.length > 0 ? (
+            <ol className="compact-activity-list">{recentActivities.map((activity) => <TimelineItem activity={activity} key={activity.id} />)}</ol>
+          ) : (
+            <div className="overview-empty-ledger"><Icon name="activity" size={20} /><span><strong>No commands recorded</strong><small>The local audit stream is quiet.</small></span></div>
+          )}
+        </div>
+      </section>
+    </div>
   )
 }
